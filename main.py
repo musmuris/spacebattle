@@ -2,6 +2,8 @@ import pyglet
 from pyglet.window import key
 import images
 
+# Images from Kenney at https://www.kenney.nl/assets/space-shooter-redux
+
 PLAYER_SPEED = 300.0
 LASER_SPEED = 500.0
 
@@ -29,6 +31,7 @@ def shoot():
 
 def spawnEnemy():
     enemy = pyglet.sprite.Sprite(img=enemy_image, x=window.width // 2, y=700, batch=enemybatch)
+    enemy.scale = 0.5
     enemies.append(enemy)
 
 @window.event
