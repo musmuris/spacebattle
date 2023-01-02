@@ -32,4 +32,5 @@ def load_images():
             y = texture.height - y - h
             setattr(images, child.attrib["name"].replace('.png', ''), anchor_center_image(texture.get_region(x=x,y=y,width=w,height=h)))
 
+    images.black_background = pyglet.resource.image("black.png")
     return images

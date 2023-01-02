@@ -60,6 +60,8 @@ class Bounds:
                 self.bottom <= other.top )
 
 
+background = pyglet.image.TileableTexture.create_for_image(images.black_background)
+
 player = pyglet.sprite.Sprite(img=player_image, x=window.width // 2, y=player_image.height)
 player.bounds = Bounds(player)
 player.name = "player"
@@ -152,6 +154,7 @@ def update(dt):
 @window.event
 def on_draw():
     window.clear()
+    background.blit_tiled(0, 0, 0, window.width, window.height)
     laserbatch.draw()
     enemybatch.draw()
     player.draw()
