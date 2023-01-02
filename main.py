@@ -1,5 +1,6 @@
 import pyglet
 from pyglet.window import key
+import images
 
 PLAYER_SPEED = 300.0
 LASER_SPEED = 500.0
@@ -8,21 +9,13 @@ window = pyglet.window.Window(1024,768)
 keys = key.KeyStateHandler()
 window.push_handlers(keys)
 
-pyglet.resource.path = ['assets']
-pyglet.resource.reindex()
+images = images.load_images()
 
-def anchor_center_image(imageFile):
-    image = pyglet.resource.image(imageFile)
-    image.anchor_x = image.width // 2
-    image.anchor_y = image.height // 2
-    return image
+player_image = images.playerShip2_orange
+enemy_image = images.enemyBlue1
+laser_image = images.laserRed15
 
-player_image = anchor_center_image("playerShip2_orange.png")
 player = pyglet.sprite.Sprite(img=player_image, x=window.width // 2, y=player_image.height)
-
-enemy_image = anchor_center_image("enemyBlue1.png")
-
-laser_image = anchor_center_image("laserRed15.png")
 
 lasers = []
 laserbatch = pyglet.graphics.Batch()
