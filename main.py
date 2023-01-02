@@ -1,12 +1,17 @@
 import pyglet
 from pyglet.window import key
 import images
+import random
+import sys
 
 # Images from Kenney at https://www.kenney.nl/assets/space-shooter-redux
 
 PLAYER_SPEED = 300.0
 LASER_SPEED = 500.0
 LASER_COOLDOWN = 0.5
+ENEMY_SPEED = 500.0
+ENEMY_COOLDOWN = 1.0
+
 
 window = pyglet.window.Window(1024,768)
 keys = key.KeyStateHandler()
@@ -24,6 +29,7 @@ enemy_image = images.enemyBlue1
 laser_image = images.laserRed15
 state.timeSoFar = 0
 state.lastLaserTime = 0
+state.lastEnemyTime = 0
 state.score = 0 
 
 
@@ -56,6 +62,7 @@ class Bounds:
 
 player = pyglet.sprite.Sprite(img=player_image, x=window.width // 2, y=player_image.height)
 player.bounds = Bounds(player)
+player.name = "player"
 
 lasers = []
 laserbatch = pyglet.graphics.Batch()
@@ -66,12 +73,16 @@ enemybatch = pyglet.graphics.Batch()
 def shoot():
     laser = pyglet.sprite.Sprite(img=laser_image, x=player.x, y=player.y+10, batch=laserbatch)
     laser.bounds = Bounds(laser)
+    laser.name = "laser"
     lasers.append(laser)
 
 def spawnEnemy():
-    enemy = pyglet.sprite.Sprite(img=enemy_image, x=window.width // 2, y=700, batch=enemybatch)
+    xpoint = random.random() * (window.width/2) + window.width/4
+    enemy = pyglet.sprite.Sprite(img=enemy_image, x=xpoint // 1, y=window.height + enemy_image.height, batch=enemybatch)
     enemy.scale = 0.5
+    enemy.xdir = 1 if random.random() > 0.5 else -1
     enemy.bounds = Bounds(enemy)
+    enemy.name = "enemy"
     enemies.append(enemy)
 
 def updateLasers(dt):
@@ -79,25 +90,47 @@ def updateLasers(dt):
     for laser in lasers: 
         laser.y += dt * LASER_SPEED
         if laser.y > window.height + laser_image.height:
-            laser.delete()
             deadlaser.append(laser)
+
     for laser in deadlaser:
+        laser.delete()
         lasers.remove(laser)
+
+def updateEnemies(dt):
+    if state.timeSoFar - state.lastEnemyTime > ENEMY_COOLDOWN:
+        state.lastEnemyTime = state.timeSoFar
+        spawnEnemy()
+
+    deadenemies = []
+    for enemy in enemies:
+        enemy.y -= dt * 200
+        enemy.x += dt * 200 * enemy.xdir
+        if enemy.x > window.width - 30 or enemy.x < 30:
+            enemy.xdir = -enemy.xdir
+        if enemy.y < -enemy.height:
+            deadenemies.append(enemy)
+    
+    for enemy in deadenemies:
+        enemy.delete()
+        enemies.remove(enemy)               
 
 def collisions():
     deadlaser = []
     deadenemies = []
     for enemy in enemies:
+        if enemy.bounds.collides_with(player.bounds):
+            sys.exit(0)            
         for laser in lasers:
             if laser.bounds.collides_with(enemy.bounds):        
-                laser.delete()
-                enemy.delete()
+                deadenemies.append(enemy)
                 deadlaser.append(laser)
                 state.score += 1
     for laser in deadlaser:
+        laser.delete()                
         lasers.remove(laser)
     for enemy in deadenemies:
-        enemy.remove(laser)               
+        enemy.delete()
+        enemies.remove(enemy)               
 
 def update(dt):
     state.timeSoFar += dt
@@ -106,6 +139,8 @@ def update(dt):
 
     updateLasers(dt)
 
+    updateEnemies(dt)
+
     if keys[key.LEFT] and player.x > player.width // 2 + 10:
             player.x -= dt * PLAYER_SPEED
     if keys[key.RIGHT] and player.x < window.width - player.width // 2 - 10:
@@ -113,9 +148,6 @@ def update(dt):
     if keys[key.SPACE] and (state.timeSoFar - state.lastLaserTime) > LASER_COOLDOWN:
         state.lastLaserTime = state.timeSoFar
         shoot()
-
-    if len(enemies) == 0 :
-        spawnEnemy()
 
 @window.event
 def on_draw():
