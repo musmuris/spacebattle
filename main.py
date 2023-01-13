@@ -1,5 +1,6 @@
 import pyglet
 from pyglet.window import key
+from actor import Actor
 import images
 import random
 import sys
@@ -24,7 +25,6 @@ class State:
 
 state = State()
 
-player_image = images.playerShip2_orange
 enemy_image = images.enemyBlue1
 laser_image = images.laserRed15
 state.timeSoFar = 0
@@ -32,39 +32,41 @@ state.lastLaserTime = 0
 state.lastEnemyTime = 0
 state.score = 0 
 
+class Player(Actor):
+    def __init__(self, batch, **kwargs):
+        image = images.playerShip2_orange
+        super(Player, self).__init__(img=image, x=window.width // 2, y=image.height, batch=batch, **kwargs)
+        self.name = "player"
 
-class Bounds:
-    def __init__(self, sprite):
-        self.sprite = sprite
+class Laser(Actor):
+    def __init__(self, **kwargs):
+        super(Laser,self).__init__(img=images.laserRed15, **kwargs)
+
+    def update(self,dt):
+        self.y += dt * LASER_SPEED
+        if self.y > window.height + laser_image.height:
+            self.dead = True
+
+class Enemy(Actor):
+    def __init__(self, **kwargs):
+        super(Enemy,self).__init__(img=images.enemyBlue1, **kwargs)
+        self.scale = 0.5
+        self.xdir = 1 if random.random() > 0.5 else -1
+        self.name = "enemy"
+
+    def update(self,dt):
+        self.y -= dt * 200
+        self.x += dt * 200 * self.xdir
+        if self.x > window.width - 30 or self.x < 30:
+            self.xdir = -self.xdir
+        if self.y < -self.height:
+            self.dead = True
     
-    @property
-    def top(self):
-        return self.bottom + self.sprite.height
-    
-    @property
-    def bottom(self):
-        return self.sprite.y - self.sprite.image.anchor_y * self.sprite.scale
-
-    @property
-    def left(self):
-        return self.sprite.x - self.sprite.image.anchor_x * self.sprite.scale
-
-    @property
-    def right(self):
-        return self.left + self.sprite.width
-
-    def collides_with(self, other):
-        return (self.right >= other.left and
-                self.left <= other.right and
-                self.top >= other.bottom and
-                self.bottom <= other.top )
-
 
 background = pyglet.image.TileableTexture.create_for_image(images.black_background)
 
-player = pyglet.sprite.Sprite(img=player_image, x=window.width // 2, y=player_image.height)
-player.bounds = Bounds(player)
-player.name = "player"
+playerbatch = pyglet.graphics.Batch()
+player = Player(batch=playerbatch)
 
 lasers = []
 laserbatch = pyglet.graphics.Batch()
@@ -73,75 +75,59 @@ enemies = []
 enemybatch = pyglet.graphics.Batch()
 
 def shoot():
-    laser = pyglet.sprite.Sprite(img=laser_image, x=player.x, y=player.y+10, batch=laserbatch)
-    laser.bounds = Bounds(laser)
-    laser.name = "laser"
+    laser = Laser(x=player.x, y=player.y+10, batch=laserbatch)
     lasers.append(laser)
 
 def spawnEnemy():
     xpoint = random.random() * (window.width/2) + window.width/4
-    enemy = pyglet.sprite.Sprite(img=enemy_image, x=xpoint // 1, y=window.height + enemy_image.height, batch=enemybatch)
-    enemy.scale = 0.5
-    enemy.xdir = 1 if random.random() > 0.5 else -1
-    enemy.bounds = Bounds(enemy)
-    enemy.name = "enemy"
+    enemy = Enemy(x=xpoint // 1, y=window.height + enemy_image.height, batch=enemybatch)
     enemies.append(enemy)
 
 def updateLasers(dt):
-    deadlaser = []
-    for laser in lasers: 
-        laser.y += dt * LASER_SPEED
-        if laser.y > window.height + laser_image.height:
-            deadlaser.append(laser)
-
-    for laser in deadlaser:
-        laser.delete()
-        lasers.remove(laser)
+    for laser in lasers:
+        laser.update(dt)
 
 def updateEnemies(dt):
     if state.timeSoFar - state.lastEnemyTime > ENEMY_COOLDOWN:
         state.lastEnemyTime = state.timeSoFar
         spawnEnemy()
 
-    deadenemies = []
     for enemy in enemies:
-        enemy.y -= dt * 200
-        enemy.x += dt * 200 * enemy.xdir
-        if enemy.x > window.width - 30 or enemy.x < 30:
-            enemy.xdir = -enemy.xdir
-        if enemy.y < -enemy.height:
-            deadenemies.append(enemy)
+        enemy.update(dt)
     
-    for enemy in deadenemies:
-        enemy.delete()
-        enemies.remove(enemy)               
-
 def collisions():
-    deadlaser = []
-    deadenemies = []
     for enemy in enemies:
-        if enemy.bounds.collides_with(player.bounds):
-            sys.exit(0)            
+        if enemy.collides_with(player):
+            player.dead = True            
         for laser in lasers:
-            if laser.bounds.collides_with(enemy.bounds):        
-                deadenemies.append(enemy)
-                deadlaser.append(laser)
+            if laser.collides_with(enemy):        
+                enemy.dead = True
+                laser.dead = True
                 state.score += 1
-    for laser in deadlaser:
-        laser.delete()                
-        lasers.remove(laser)
-    for enemy in deadenemies:
-        enemy.delete()
-        enemies.remove(enemy)               
+
+def removeDead(actors):
+    dead = []
+    for actor in actors:
+        if actor.dead:
+            actor.delete()
+            dead.append(actor)
+    for actor in dead:
+        actors.remove(actor)               
 
 def update(dt):
     state.timeSoFar += dt
 
+    if player.dead:
+        sys.exit(0)
+        
     collisions()
 
     updateLasers(dt)
 
     updateEnemies(dt)
+
+    removeDead(lasers)
+    removeDead(enemies)
 
     if keys[key.LEFT] and player.x > player.width // 2 + 10:
             player.x -= dt * PLAYER_SPEED
@@ -154,7 +140,7 @@ def update(dt):
 @window.event
 def on_draw():
     window.clear()
-    background.blit_tiled(0, 0, 0, window.width, window.height)
+    background.blit_tiled(0, 0, 0, window.width, window.height )
     laserbatch.draw()
     enemybatch.draw()
     player.draw()
